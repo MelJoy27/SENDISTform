@@ -112,6 +112,7 @@ input:focus,textarea:focus{outline:3px solid var(--focus);outline-offset:2px;bor
 .chip input:checked + span::before{content:"✓ "}
 .chip input:focus-visible + span,.chip-btn:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
 .chip-btn{font-size:15.5px;padding:5px 13px;margin:6px 8px 0 0}
+.chip-btn[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
 
 .opt{display:flex;gap:14px;align-items:flex-start;padding:14px 16px;border:2px solid var(--line);border-radius:12px;margin:0 0 10px;cursor:pointer;background:var(--surface)}
 .opt:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
@@ -130,6 +131,13 @@ input:focus,textarea:focus{outline:3px solid var(--focus);outline-offset:2px;bor
 .btn.ghost{background:transparent;color:var(--ink);border-color:var(--line-strong)}
 .btn:focus-visible{outline:3px solid var(--focus);outline-offset:3px}
 .btn:disabled{opacity:.65;cursor:progress}
+.btn.primary:disabled{cursor:not-allowed}
+.ack{background:#FFF4CC;color:#1A1300;border:2px solid #E6C85C;border-radius:12px;padding:16px 20px;margin:0 0 24px}
+.ack h3{margin:0 0 6px;color:#1A1300}
+.ack p{margin:0 0 12px}
+.ack label{display:flex;gap:12px;align-items:flex-start;cursor:pointer;font-weight:700}
+.ack input{width:26px;height:26px;margin-top:1px;accent-color:#1A1300;flex:none}
+.ack input:focus-visible{outline:3px solid #1A1300;outline-offset:3px}
 .btn.big{font-size:20px;padding:15px 30px}
 .spacer{flex:1}
 
@@ -207,9 +215,6 @@ address{font-style:normal;background:var(--bg);border-radius:12px;padding:14px 1
     </details>
   </aside>
 </main>
-<footer class="foot">
-  <p>This is an unofficial helper. It is not legal advice and it is not run by the Tribunal. It fills in the Notice of Appeal form from the Northern Ireland Courts and Tribunals Service for you, so check the finished PDF, and make sure you are using the Tribunal’s current form, before you send it.</p>
-</footer>
 <div class="sr" id="live" aria-live="polite"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -406,7 +411,7 @@ function activeGroups(){ return RG.filter(g=>g.types.some(t=>S.appeal.types[t]))
 const firstName = () => (S.child.first||'').trim().split(/\s+/)[0] || 'my child';
 function seedFor(key){
   const t=S.appeal.types, N=firstName(), P=N+'’s';
-  if(key==='assess'&&t[1]) return `I am appealing the Education Authority’s refusal to carry out a Statutory Assessment. The legal threshold for triggering a Statutory Assessment under Article 15 of the Education (Northern Ireland) Order 1996 is clearly met in this case. Despite support offered at school level, ${N} continues to experience significant and persistent barriers to learning. Without a full assessment, the Education Authority cannot reasonably determine the nature or extent of ${P} needs, nor whether the school can meet them from its own resources.`;
+  if(key==='assess'&&t[1]) return `I am appealing the Education Authority’s refusal to carry out a Statutory Assessment. Despite support offered at school level, ${N} continues to experience significant and persistent barriers to learning. Without a full assessment, the Education Authority cannot reasonably determine the nature or extent of ${P} needs, nor whether the school can meet them from its own resources.`;
   if(key==='parts'&&t[5]) return `I am appealing the contents of Part 3 of the Statement of Special Educational Needs issued for ${N} on the grounds that the provision it contains is insufficiently specific, detailed, or quantified, and therefore fails to comply with legal and procedural requirements.`;
   if(key==='school'&&t[6]) return `I am appealing the placement named in Part 4 of the Statement of Special Educational Needs issued for ${N}.\nThe named placement was not parental preference and is not capable of meeting ${P} identified needs as set out in Parts 2 and 3 of the Statement. The Education Authority has not correctly applied the legal test when determining school placement and has failed to properly consider parental preference, as required by law.`;
   return '';
@@ -557,15 +562,30 @@ function chips(label,path,options,o={}){
   <div class="chips">${options.map(opt=>`<label class="chip"><input type="radio" name="${path}" value="${esc(opt)}" data-path="${path}"${o.deselect?' data-deselect':''}${o.rr?' data-rr':''}${cur===opt?' checked':''}><span>${esc(opt)}</span></label>`).join('')}</div></fieldset>`;
 }
 function fillBtns(path,vals){ return vals.map(v=>`<button type="button" class="chip-btn" data-fill="${path}" data-val="${esc(v)}">${esc(v)}</button>`).join(''); }
+let ack=false;
+let relOther={};
+function relOtherOpen(key){ const r=get(key+'.rel'); return !!relOther[key] || (!!r && r!=='Mother' && r!=='Father'); }
+function relBtns(key){
+  const r=get(key+'.rel');
+  const b=(v,on)=>`<button type="button" class="chip-btn" data-rel="${key}" data-val="${v}" aria-pressed="${on?'true':'false'}">${v}</button>`;
+  return b('Mother',r==='Mother')+b('Father',r==='Father')+b('Other',relOtherOpen(key));
+}
+let genderOther=false;
+function genderOtherOpen(){ const g=S.child.gender; return genderOther || (!!g && g!=='Male' && g!=='Female'); }
+function genderBtns(){
+  const g=S.child.gender, open=genderOtherOpen();
+  const b=(v,on)=>`<button type="button" class="chip-btn" data-gender="${v}" aria-pressed="${on?'true':'false'}">${v}</button>`;
+  return b('Male',g==='Male')+b('Female',g==='Female')+b('Other',open);
+}
 function toggle(label,path){ return `<label class="tog"><input type="checkbox" data-path="${path}" data-rr${get(path)?' checked':''}>${label}</label>`; }
 function parentFields(key,first){
   const ac = first ? {sn:'family-name',fn:'given-name',a1:'address-line1',a2:'address-line2',a3:'address-level2',pc:'postal-code',t1:'tel',t2:'tel'} : {};
   return `${chips('Title',key+'.title',['Mr','Mrs','Miss','Ms','Other'],{deselect:true})}
-  <div class="row">${inp('Surname',key+'.surname',{ac:ac.sn})}${inp('First names',key+'.first',{ac:ac.fn})}</div>
-  <div class="f"><label class="l" for="${idOf(key+'.rel')}">Your relationship to the child</label>
-   <input id="${idOf(key+'.rel')}" type="text" data-path="${key}.rel" value="${esc(get(key+'.rel'))}" autocomplete="off" placeholder="e.g. mother">
-   <div>${fillBtns(key+'.rel',['Mother','Father','Guardian'])}</div>
-   <p class="warn" data-for="${key}.rel" hidden>That is longer than the space on the form, so it will print quite small.</p></div>
+  <div class="row">${inp('First names',key+'.first',{ac:ac.fn})}${inp('Surname',key+'.surname',{ac:ac.sn})}</div>
+  <div class="f"><span class="l" id="${idOf(key+'.rel')}-l">Your relationship to the child</span>
+   <div role="group" aria-labelledby="${idOf(key+'.rel')}-l">${relBtns(key)}</div>
+   ${relOtherOpen(key)?`<input id="${idOf(key+'.rel')}" type="text" data-path="${key}.rel" value="${esc(['Mother','Father'].includes(get(key+'.rel'))?'':get(key+'.rel'))}" autocomplete="off" placeholder="e.g. guardian" aria-label="Your relationship to the child, in your own words" style="margin-top:10px">
+   <p class="warn" data-for="${key}.rel" hidden>That is longer than the space on the form, so it will print quite small.</p>`:''}</div>
   ${inp('Address line 1',key+'.a1',{ac:ac.a1})}${inp('Address line 2',key+'.a2',{ac:ac.a2})}
   <div class="row">${inp('Town or city',key+'.a3',{ac:ac.a3})}${inp('Postcode',key+'.pc',{ac:ac.pc})}</div>
   <div class="row">${inp('Daytime phone number',key+'.tel1',{ac:ac.t1,type:'tel'})}${inp('Home or mobile number',key+'.tel2',{ac:ac.t2,type:'tel'})}</div>`;
@@ -579,7 +599,9 @@ const STEPS = [
    title:()=> hadSaved&&resumeStep>0 ? 'Welcome back' : 'Let’s fill in your SEN appeal form',
    body(){
      const back = hadSaved&&resumeStep>0;
-     return `<p class="lead">${back?'Your answers from last time are still here, saved on this device. Pick up where you left off, or start again.':'We’ll ask you a few questions, one part at a time, and write your answers onto the Tribunal’s own Notice of Appeal form. At the end you download it as a PDF, ready to send.'}</p>
+     return `<div class="ack"><h3>Please read this first</h3><p>This form is not a substitute for legal advice and is not run by the Tribunal. It fills in the Notice of Appeal form from the Northern Ireland Courts and Tribunals Service for you, so check the finished PDF, and make sure you are using the Tribunal’s current form, before you send it.</p>
+     <label><input type="checkbox" id="ack"${ack?' checked':''}>I have read and understood this</label></div>
+     <p class="lead">${back?'Your answers from last time are still here, saved on this device. Pick up where you left off, or start again.':'We’ll ask you a few questions, one part at a time, and write your answers onto the Tribunal’s own Notice of Appeal form. At the end you download it as a PDF, ready to send.'}</p>
      <h3>Have these to hand</h3>
      <ul>
        <li>The letter from the Education Authority (EA) that told you that you could appeal</li>
@@ -595,12 +617,12 @@ const STEPS = [
    title:()=>'About your child',
    body(){
      return `<p class="lead">This goes on page 3 of the form. We type in capitals, as the form asks.</p>
-     <div class="row">${inp('Child’s surname','child.surname')}${inp('Child’s first name(s)','child.first')}</div>
+     <div class="row">${inp('Child’s first name(s)','child.first')}${inp('Child’s surname','child.surname')}</div>
      ${dateField('Child’s date of birth','child.dob')}
-     <div class="f"><label class="l" for="f-child-gender">Child’s gender</label>
-       <input id="f-child-gender" type="text" data-path="child.gender" value="${esc(S.child.gender)}" autocomplete="off">
-       <div>${fillBtns('child.gender',['Male','Female'])}</div>
-       <p class="warn" data-for="child.gender" hidden>That is longer than the space on the form.</p></div>
+     <div class="f"><span class="l" id="f-child-gender-l">Child’s gender</span>
+       <div role="group" aria-labelledby="f-child-gender-l">${genderBtns()}</div>
+       ${genderOtherOpen()?`<input id="f-child-gender" type="text" data-path="child.gender" value="${esc(['Male','Female'].includes(S.child.gender)?'':S.child.gender)}" autocomplete="off" aria-label="Child’s gender, in your own words" style="margin-top:10px">
+       <p class="warn" data-for="child.gender" hidden>That is longer than the space on the form.</p>`:''}</div>
      ${chips('Child’s ethnic origin (optional)','child.ethnic',ETH_OPTS,{deselect:true,rr:true,hint:'The Tribunal uses this for statistics and keeps it confidential. You can skip it. Tap a choice again to untick it.'})}
      ${S.child.ethnic==='Other'?inp('Please give details','child.ethnicOther'):''}
      <h3>Dispute Avoidance and Resolution Service (DARS)</h3>
@@ -722,8 +744,8 @@ function render(o={}){
   const startBack=hadSaved&&resumeStep>0&&S.step===0;
   panel.innerHTML=`<h2 id="stepTitle" tabindex="-1">${st.title()}</h2>${st.body()}
    <div class="nav">${S.step>0?`<button type="button" class="btn ghost" data-nav="-1">Back</button>`:`<span></span>`}
-   ${startBack?`<button type="button" class="btn ghost" data-start-over>Start again</button><span class="spacer"></span><button type="button" class="btn primary" data-go="${resumeStep}">Continue where I left off</button>`
-     :(last?'':`<button type="button" class="btn primary" data-nav="1">${S.step===0?'Start':'Continue'}</button>`)}</div>`;
+   ${startBack?`<button type="button" class="btn ghost" data-start-over>Start again</button><span class="spacer"></span><button type="button" class="btn primary" data-go="${resumeStep}"${ack?'':' disabled'}>Continue where I left off</button>`
+     :(last?'':`<button type="button" class="btn primary" data-nav="1"${S.step===0&&!ack?' disabled':''}>${S.step===0?'Start':'Continue'}</button>`)}</div>`;
   renderRail();
   if(o.focusId){ const el=document.getElementById(o.focusId); if(el){ el.focus({preventScroll:true}); if(el.setSelectionRange&&o.sel!=null){ try{ el.setSelectionRange(o.sel,o.sel); }catch(e){} } } }
   else if(!o.keep){ const h=$('#stepTitle'); h.focus({preventScroll:true}); window.scrollTo({top:Math.max(0,panel.getBoundingClientRect().top+window.scrollY-16),behavior:'auto'}); live.textContent=S.step===0?'':'Step '+S.step+' of 7: '+st.name; }
@@ -745,7 +767,7 @@ function renderRail(){
   mprog.innerHTML=n===0?'':`<div>Step <b>${n}</b> of 7: <b>${STEPS[n].name}</b></div><div class="bar" role="presentation"><i style="width:${Math.round(n/7*100)}%"></i></div>`;
   $('#railfoot').innerHTML=`<p>Tribunal office:<br>(028) 9072 4847<br>(028) 9072 4886</p><button type="button" class="linkbtn" id="wipe">Clear all my answers</button>`;
 }
-function go(n){ S.step=Math.max(0,Math.min(STEPS.length-1,n)); persist(); render(); }
+function go(n){ if(!ack&&n>0) return; S.step=Math.max(0,Math.min(STEPS.length-1,n)); persist(); render(); }
 
 function refresh(){
   persist();
@@ -837,6 +859,7 @@ panel.addEventListener('input',e=>{
   if(S.step===7) renderRail();
 });
 panel.addEventListener('change',e=>{
+  if(e.target.id==='ack'){ ack=e.target.checked; panel.querySelectorAll('.nav button[data-nav="1"],.nav button[data-go]').forEach(b=>{ b.disabled=!ack; }); return; }
   const el=e.target, p=el.dataset.path; if(!p) return;
   if(el.type==='checkbox'){
     set(p,el.checked);
@@ -856,7 +879,27 @@ panel.addEventListener('click',e=>{
     return;
   }
   const b=el.closest&&el.closest('button'); if(!b) return;
-  if(b.dataset.fill){ set(b.dataset.fill,b.dataset.val); const i=document.getElementById(idOf(b.dataset.fill)); if(i){ i.value=b.dataset.val; i.focus(); } refresh(); renderRail(); }
+  if(b.dataset.rel){
+    const k=b.dataset.rel, v=b.dataset.val, r=get(k+'.rel');
+    if(v==='Other'){
+      if(relOtherOpen(k)){ relOther[k]=false; set(k+'.rel',''); }
+      else { relOther[k]=true; if(r==='Mother'||r==='Father') set(k+'.rel',''); }
+    } else { relOther[k]=false; set(k+'.rel',r===v?'':v); }
+    rerender();
+    if(v==='Other'&&relOther[k]){ const i=document.getElementById(idOf(k+'.rel')); if(i) i.focus(); }
+    renderRail(); return;
+  }
+  if(b.dataset.gender){
+    const v=b.dataset.gender, g=S.child.gender;
+    if(v==='Other'){
+      if(genderOtherOpen()){ genderOther=false; set('child.gender',''); }
+      else { genderOther=true; if(g==='Male'||g==='Female') set('child.gender',''); }
+    } else { genderOther=false; set('child.gender',g===v?'':v); }
+    rerender();
+    if(v==='Other'&&genderOther){ const i=document.getElementById('f-child-gender'); if(i) i.focus(); }
+    renderRail(); return;
+  }
+  else if(b.dataset.fill){ set(b.dataset.fill,b.dataset.val); const i=document.getElementById(idOf(b.dataset.fill)); if(i){ i.value=b.dataset.val; i.focus(); } refresh(); renderRail(); }
   else if(b.dataset.seed){ const k=b.dataset.seed, t=seedFor(k); if(t){ S.reasons[k]=t; S.seedText[k]=t; S.seeded[k]=true; rerender(); } }
   else if(b.dataset.nav){ go(S.step+ +b.dataset.nav); }
   else if(b.dataset.go!=null){ go(+b.dataset.go); }
@@ -885,7 +928,7 @@ $('#railfoot').addEventListener('click',e=>{
   else{ clearTimeout(wipeArm); wipeArm=null; resetAll(); }
 });
 function resetAll(){
-  wipeSaved(); S=defaults(); S.sign.date=todayParts(); sig={strokes:[],dataUrl:'',aspect:1}; hadSaved=false; resumeStep=0; tabsKey=''; go(0);
+  genderOther=false; relOther={}; ack=false; wipeSaved(); S=defaults(); S.sign.date=todayParts(); sig={strokes:[],dataUrl:'',aspect:1}; hadSaved=false; resumeStep=0; tabsKey=''; go(0);
 }
 const mq=window.matchMedia('(min-width:1100px)');
 function syncPeek(){ if(mq.matches) peekd.open=true; }
